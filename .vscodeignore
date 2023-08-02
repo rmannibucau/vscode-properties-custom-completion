@@ -9,4 +9,4 @@ tsconfig.json
 vsc-extension-quickstart.md
 *.vsix
 sort.ps1
-words.old
+generated/**
