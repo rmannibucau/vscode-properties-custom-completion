@@ -1,17 +1,51 @@
 'use strict'
 
-import { readFileSync, statSync } from 'fs';
+import { statSync } from 'fs';
+import { readFile } from 'fs/promises';
+import * as http from 'http';
+import * as https from 'https';
+import { URL } from 'url';
 import * as vscode from 'vscode';
+
+const NO_MODIFICATION = new Date(0);
 
 const cachedKeys = {
     // [filename]: {lastModified:...,completion:[completionItems]}
 };
 
-function loadCompletions(path) {
-    const text = readFileSync(path, { encoding: 'utf-8' });
-    const lines = text.split('\n');
+function GET(url: string): Promise<string> {
+    const parsedUrl = new URL(url);
+    return new Promise((ok, ko) => {
+        const req = (parsedUrl.protocol.toLowerCase() === 'https' ? https : http).request(
+            { method: 'GET', hostname: parsedUrl.hostname, path: parsedUrl.pathname, port: parsedUrl.port },
+            res => {
+                var str = '';
+                res.on('data', chunk => { str += chunk });
+                res.on('err', err => {
+                    str = undefined;
+                    ko(err);
+                });
+                res.on('end', () => {
+                    if (str) {
+                        ok(str);
+                    }
+                });
+            });
+        req.on('error', err => {
+            ko(err);
+        });
+        req.end();
+    });
+}
 
-    const all = [];
+function isUrl(path: string) {
+    return path.startsWith('https://') || path.startsWith('http://');
+}
+
+function parseContent(content: string): vscode.CompletionItem[] {
+    const lines = content.split('\n');
+
+    const all: vscode.CompletionItem[] = [];
     let currentKey = '';
     let currentDesc = '';
 
@@ -61,9 +95,20 @@ function loadCompletions(path) {
     return all;
 }
 
+async function loadCompletions(path: string): Promise<vscode.CompletionItem[]> {
+    const content = isUrl(path) ?
+        await GET(path) :
+        await readFile(path, { encoding: 'utf-8' });
+    return parseContent(content);
+}
+
 export class PropertiesCompletionItemProvider implements vscode.CompletionItemProvider {
-    public provideCompletionItems(document: vscode.TextDocument, position: vscode.Position, _token: vscode.CancellationToken):
-        vscode.CompletionItem[] | Thenable<vscode.CompletionItem[]> {
+    public provideCompletionItems(document: vscode.TextDocument, position: vscode.Position, _token: vscode.CancellationToken): vscode.CompletionItem[] | Thenable<vscode.CompletionItem[]> {
+        if (position.line === 0 && position.character === 0) {
+            return [ // avoid to remind it so if at the beginning propose the magic prefix
+                new vscode.CompletionItem('# vscode_properties_completion_proposals=', vscode.CompletionItemKind.Text),
+            ];
+        }
 
         const linePrefix = document.lineAt(position).text.slice(0, position.character);
         if (linePrefix.startsWith('#') || linePrefix.indexOf('=') > 0) { // value is not completed by this extension
@@ -72,16 +117,16 @@ export class PropertiesCompletionItemProvider implements vscode.CompletionItemPr
 
         // load completion if present
         // todo: support more lines?
-        const prolog = document.lineAt(0).text;
-        if (!prolog || !prolog.startsWith('# vscode_properties_completion_proposals=')) {
+        const directive = document.lineAt(0).text;
+        if (!directive || !directive.startsWith('# vscode_properties_completion_proposals=')) {
             return [];
         }
 
-        const path = prolog.substring('# vscode_properties_completion_proposals='.length).trim();
+        const path = directive.substring('# vscode_properties_completion_proposals='.length).trim();
 
         // load data if needed
         let data = cachedKeys[path];
-        const stat = statSync(path);
+        const stat = isUrl(path) ? { mtime: NO_MODIFICATION } : statSync(path);
         if (!data || data.lastModified != stat.mtime.getTime()) {
             data = {
                 lastModified: stat.mtime.getTime(),
@@ -93,7 +138,8 @@ export class PropertiesCompletionItemProvider implements vscode.CompletionItemPr
         // compute completion
         return data
             .completion
-            .filter((it: vscode.CompletionItem) => it.label.toString().indexOf(linePrefix) >= 0)
-            .sort((a: vscode.CompletionItem, b: vscode.CompletionItem) => a.label.toString().localeCompare(b.label.toString()));
+            .then((items: vscode.CompletionItem[]) => items
+                .filter((it: vscode.CompletionItem) => it.label.toString().indexOf(linePrefix) >= 0)
+                .sort((a: vscode.CompletionItem, b: vscode.CompletionItem) => a.label.toString().localeCompare(b.label.toString())));
     }
 }
