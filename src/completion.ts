@@ -93,6 +93,7 @@ export class PropertiesCompletionItemProvider implements vscode.CompletionItemPr
         // compute completion
         return data
             .completion
-            .filter((it: vscode.CompletionItem) => it.label.toString().startsWith(linePrefix));
+            .filter((it: vscode.CompletionItem) => it.label.toString().indexOf(linePrefix) >= 0)
+            .sort((a: vscode.CompletionItem, b: vscode.CompletionItem) => a.label.toString().localeCompare(b.label.toString()));
     }
 }
