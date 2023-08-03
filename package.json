@@ -14,7 +14,7 @@
     ],
     "repository": {
         "type": "git",
-        "url": "https://github.com/yupiik/vscode-properties-custom-completion"
+        "url": "https://github.com/rmannibucau/vscode-properties-custom-completion"
     },
     "activationEvents": [
         "onLanguage:properties",

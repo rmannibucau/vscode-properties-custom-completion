@@ -1,3 +1,7 @@
+## [1.5.0](https://github.com/rmannibucau/vscode-properties-custom-completion/compare/1.4.0...1.5.0) (-)
+
+* Fix repository url
+
 ## [1.4.0](https://github.com/rmannibucau/vscode-properties-custom-completion/compare/1.3.0...1.4.0) (2023-08-03)
 
 * Add support for `java-properties` files
