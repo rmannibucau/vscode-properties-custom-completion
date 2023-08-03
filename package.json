@@ -17,7 +17,8 @@
         "url": "https://github.com/yupiik/vscode-properties-custom-completion"
     },
     "activationEvents": [
-        "onLanguage:properties"
+        "onLanguage:properties",
+        "onLanguage:java-properties"
     ],
     "main": "./out/src/extension",
     "contributes": {
